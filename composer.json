@@ -1,0 +1,28 @@
+{
+  "name": "sambukhari/laravel-exception-alert",
+  "description": "Send Laravel exception details directly to your email with simple config toggles.",
+  "type": "library",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "Sambukhari\\ExceptionAlert\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Sambukhari\\ExceptionAlert\\ExceptionAlertServiceProvider"
+      ]
+    }
+  },
+  "require": {
+    "php": ">=8.0",
+    "illuminate/support": "^10.0|^11.0"
+  },
+  "authors": [
+    {
+      "name": "Syed Ali Mujtaba Shah (Sambukhari)",
+      "email": "your@email.com"
+    }
+  ]
+}
