@@ -1,160 +1,131 @@
-<p align="center">
-  <img src="https://laravel.com/img/logomark.min.svg" width="100" alt="Laravel Logo">
-</p>
+# Laravel Exception Alert 🚨
 
-<h1 align="center">🚨 Laravel Exception Alert</h1>
-
-<p align="center">
-  <b>Instant Email Alerts for Laravel Exceptions — Simple, Fast & Developer-Friendly</b>
-</p>
-
-<p align="center">
-  <a href="https://packagist.org/packages/sambukhari/laravel-exception-alert"><img src="https://img.shields.io/packagist/v/sambukhari/laravel-exception-alert.svg?style=flat-square" alt="Packagist Version"></a>
-  <a href="https://packagist.org/packages/sambukhari/laravel-exception-alert"><img src="https://img.shields.io/packagist/dt/sambukhari/laravel-exception-alert.svg?style=flat-square" alt="Downloads"></a>
-  <a href="https://github.com/sambukhari/laravel-exception-alert/stargazers"><img src="https://img.shields.io/github/stars/sambukhari/laravel-exception-alert?style=flat-square" alt="GitHub Stars"></a>
-  <a href="https://github.com/sambukhari/laravel-exception-alert/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License"></a>
-</p>
+A lightweight Laravel package that sends automatic exception alerts directly to your email.  
+Perfect for developers who want to stay informed about critical exceptions without complex monitoring tools.
 
 ---
 
-## 📦 Introduction
+## ✨ Features
 
-**Laravel Exception Alert** automatically sends detailed exception alerts directly to your **email inbox** whenever a critical error occurs in your Laravel application.
-
-✅ No manual setup  
-✅ No third-party dependencies  
-✅ 100% plug-and-play
+- Automatically emails exceptions to the developer.
+- Configurable exception types (e.g., 404, 401, 500).
+- Simple `.env` setup — just add your email.
+- Main ON/OFF switch for alerting.
+- Seamless integration — no manual editing in `Handler.php`.
 
 ---
 
-## 🚀 Installation
+## ⚙️ Installation
 
-Run the following command in your Laravel project:
+Install the package via Composer:
 
 ```bash
 composer require sambukhari/laravel-exception-alert
-⚙️ Configuration
+```
 
-Publish the configuration file:
+After installation, publish the configuration file:
 
-php artisan vendor:publish --provider="Sambukhari\\ExceptionAlert\\ExceptionAlertServiceProvider"
+```bash
+php artisan vendor:publish --tag=exception-alert-config
+```
 
+This will create the config file at:
 
-This creates a config file at:
-
+```
 config/exception-alert.php
+```
 
-Example Configuration
+---
+
+## 🔧 Configuration
+
+Add your developer email to the `.env` file:
+
+```env
+EXCEPTION_ALERT_EMAIL=developer@example.com
+```
+
+Then open `config/exception-alert.php` — all options are `true` by default:
+
+```php
 return [
-    // Global ON/OFF switch for alerts
-    'enabled' => true,
+    'enabled' => true, // Master switch
 
-    // Developer email to receive exception alerts
-    'developer_email' => env('EXCEPTION_ALERT_EMAIL', 'your@email.com'),
-
-    // Control which exception types send alerts
     'exceptions' => [
-        '404' => true,
-        '401' => false,
-        '419' => false,
-        '500' => true,
-        '400' => true,
-        '403' => true,
+        404 => true,
+        401 => false,
+        403 => true,
+        419 => true,
+        429 => true,
+        500 => true,
     ],
 ];
+```
 
+If you want to disable all alerts, simply set:
 
-Add your email to .env file:
+```php
+'enabled' => false
+```
 
-EXCEPTION_ALERT_EMAIL=developer@yourdomain.com
+---
 
-🧠 How It Works
+## 🚀 How It Works
 
-When an exception occurs:
+Once installed, the package automatically injects its logic into Laravel’s global exception handler.  
+You don’t need to modify `app/Exceptions/Handler.php` — it’s handled automatically.
 
-The package automatically hooks into Laravel’s exception handler (App\Exceptions\Handler).
+Whenever an exception occurs:
+1. The package checks if alerts are enabled.
+2. It verifies if that exception type (e.g., 404, 500) is marked as `true` in the config.
+3. If allowed, an email is sent to the address from `.env` with full details including:
+   - Project name & URL
+   - Exception message
+   - File and line number
+   - Stack trace
 
-It checks:
+---
 
-If alerts are globally enabled
+## 📬 Example Email Format
 
-If the exception’s status code is allowed in config
+**Subject:** `[Laravel Exception Alert] Error on myproject.com`
 
-Sends an email to the configured address containing:
+**Body:**
 
-Project name
-
-URL
-
-Exception class
-
-Error message
-
-Stack trace
-
-📨 Example Email
-
-Subject:
-
-🚨 Exception in Your Laravel App [Production]
-
-
-Body:
-
-Project: EzeTech CRM
-URL: https://ezecrm.com
+```
+Project: myproject.com
 Environment: production
-Exception: Symfony\Component\HttpKernel\Exception\NotFoundHttpException
-Message: Route [xyz] not found
-File: /var/www/html/app/Http/Controllers/ExampleController.php:45
+Exception: Division by zero
+File: /var/www/html/app/Http/Controllers/HomeController.php:42
+```
 
-🧩 Auto Code Injection
+---
 
-When the package is installed, the ExceptionHandlerInjector automatically injects the necessary logic into your App\Exceptions\Handler.php file — no manual edits required!
+## 🧑‍💻 Local Testing
 
-If you uninstall the package, Laravel’s default exception behavior is restored automatically.
+You can trigger a test alert manually:
 
-To remove:
+```bash
+php artisan exception-alert:test
+```
 
-composer remove sambukhari/laravel-exception-alert
+---
 
-🛠 Customization
+## 🪪 License
 
-You can customize email design or logic by publishing the views:
+This package is open-source software licensed under the [MIT license](LICENSE).
 
-php artisan vendor:publish --tag=exception-alert-views
+---
 
-💡 Why Use This Package?
+## 👨‍💻 Author
 
-This is perfect for developers who:
+**Syed Ali Mujtaba Shah (sambukhari)**  
+[GitHub Profile](https://github.com/sambukhari)
 
-Manage multiple Laravel apps
+---
 
-Want quick email notifications for errors
+## 💡 Contribution
 
-Prefer lightweight monitoring without Sentry or Bugsnag
+Pull requests are welcome!  
+If you find a bug or want to suggest improvements, feel free to open an issue.
 
-Want fast debugging without external dashboards
-
-👨‍💻 Author
-
-Developed by: Syed Ali Mujtaba Shah (Sam Bukhari)
-
-Role: Senior Software Engineer | Team Lead @ Eze Technologies
-
-If you find this package useful — please ⭐ star the repo on GitHub!
-
-🔮 Coming Soon
-
-Telegram & Slack Alert Support
-
-Mobile App for Real-Time Exception Alerts
-
-Web Dashboard for Exception History
-
-📜 License
-
-This package is open-sourced software licensed under the MIT license
-.
-
-<p align="center"> <sub>Crafted with ❤️ by <a href="https://github.com/sambukhari">Sam Bukhari</a></sub> </p> ```
