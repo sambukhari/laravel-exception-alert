@@ -3,31 +3,47 @@
 namespace Sambukhari\ExceptionAlert;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\File;
 
 class ExceptionAlertServiceProvider extends ServiceProvider
 {
+    /**
+     * Register bindings in the container.
+     */
     public function register()
     {
-        $this->mergeConfigFrom(__DIR__.'/../config/exception-alert.php', 'exception-alert');
+        // Merge default config into user's config
+        $this->mergeConfigFrom(
+            __DIR__ . '/../config/exception-alert.php',
+            'exception-alert'
+        );
     }
 
+    /**
+     * Bootstrap services.
+     */
     public function boot()
     {
-        // Publish config
+        // ✅ Publish the configuration file
         $this->publishes([
-            __DIR__.'/../config/exception-alert.php' => config_path('exception-alert.php'),
-        ], 'config');
+            __DIR__ . '/../config/exception-alert.php' => config_path('exception-alert.php'),
+        ], 'exception-alert-config');
 
-        // Publish email view
-        $this->loadViewsFrom(__DIR__.'/../resources/views', 'exception-alert');
+        // ✅ Load package views (for email templates)
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'exception-alert');
 
-        // Auto-inject into Handler.php
-        $this->injectHandlerCode();
+        // ✅ Automatically inject exception handling code
+        $this->autoInjectHandler();
     }
 
-    protected function injectHandlerCode()
+    /**
+     * Automatically injects code into app/Exceptions/Handler.php.
+     */
+    protected function autoInjectHandler()
     {
-        (new \Sambukhari\ExceptionAlert\ExceptionHandlerInjector())->inject();
+        try {
+            (new \Sambukhari\ExceptionAlert\ExceptionHandlerInjector())->inject();
+        } catch (\Throwable $e) {
+            \Log::error('Exception Alert: Failed to inject Handler code — ' . $e->getMessage());
+        }
     }
 }
