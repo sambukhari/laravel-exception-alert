@@ -20,12 +20,19 @@ class ExceptionOccurred extends Mailable
 
     public function build()
     {
-        return $this->subject('🚨 Exception Alert: ' . get_class($this->exception))
-                    ->view('exception-alert::email')
-                    ->with([
-                        'exception' => $this->exception,
-                        'url' => config('app.url'),
-                        'app' => config('app.name'),
-                    ]);
+        $subject = sprintf(
+            '🚨 [%s] Exception: %s',
+            config('app.name', 'Laravel'),
+            class_basename($this->exception)
+        );
+
+        return $this->subject($subject)
+            ->view('exception-alert::email')
+            ->with([
+                'exception' => $this->exception,
+                'app' => config('app.name', 'Laravel'),
+                'url' => request()->fullUrl() ?? config('app.url'),
+                'env' => config('app.env'),
+            ]);
     }
 }

@@ -1,131 +1,126 @@
-# Laravel Exception Alert 🚨
+# 🚨 Laravel Exception Alert
 
-A lightweight Laravel package that sends automatic exception alerts directly to your email.  
-Perfect for developers who want to stay informed about critical exceptions without complex monitoring tools.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)]() [![Packagist Version](https://img.shields.io/packagist/v/sambukhari/laravel-exception-alert.svg?style=flat-square)]()  
 
----
-
-## ✨ Features
-
-- Automatically emails exceptions to the developer.
-- Configurable exception types (e.g., 404, 401, 500).
-- Simple `.env` setup — just add your email.
-- Main ON/OFF switch for alerting.
-- Seamless integration — no manual editing in `Handler.php`.
+A lightweight, safe and professional Laravel package that sends exception details to a developer email.  
+Designed to be non-intrusive: it uses a trait, provides a **one-time installer** for Handler integration, publishes config and views, and includes safe uninstall/rollback.
 
 ---
 
-## ⚙️ Installation
+## Key features
 
-Install the package via Composer:
-
-```bash
-composer require sambukhari/laravel-exception-alert
-```
-
-After installation, publish the configuration file:
-
-```bash
-php artisan vendor:publish --tag=exception-alert-config
-```
-
-This will create the config file at:
-
-```
-config/exception-alert.php
-```
+- Trait-based alerting to avoid method collisions with projects that already override `report()`.  
+- One-time installer command `php artisan exception-alert:install` — **no runtime injection**.  
+- Publishes config and email view for customization.  
+- Test command to send a sample alert.  
+- Uninstall/restore command to safely remove changes.  
+- Idempotent and creates backups before modifying `app/Exceptions/Handler.php`.  
 
 ---
 
-## 🔧 Configuration
+## Requirements
 
-Add your developer email to the `.env` file:
+- PHP >= 8.0  
+- Laravel 8 / 9 / 10 / 11 (or compatible)  
+- Proper mail configuration in your `.env` (SMTP, Mailgun, SES, etc.)
 
-```env
-EXCEPTION_ALERT_EMAIL=developer@example.com
-```
+---
 
-Then open `config/exception-alert.php` — all options are `true` by default:
+## Installation (step-by-step)
+
+1. **Require the package**
+
+   If the package is on Packagist:
+   ```bash
+   composer require sambukhari/laravel-exception-alert
+   ```
+
+   If you are installing from your GitHub repository (recommended for testing before publishing):
+   1. Add repository entry to your app `composer.json` (optional):
+      ```json
+      "repositories": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/sambukhari/laravel-exception-alert"
+        }
+      ]
+      ```
+   2. Then require the package:
+      ```bash
+      composer require sambukhari/laravel-exception-alert:dev-main --prefer-source
+      ```
+
+2. **Run the one-time installer**:
+   ```bash
+   php artisan exception-alert:install
+   ```
+
+   - Publishes `config/exception-alert.php` and `resources/views/vendor/exception-alert`.
+   - Injects the trait into `app/Exceptions/Handler.php`.
+   - Creates a timestamped backup.
+
+3. **Set your recipient email** in `.env`:
+   ```bash
+   EXCEPTION_ALERT_EMAIL=developer@example.com
+   EXCEPTION_ALERT_ENABLED=true
+   ```
+
+4. **Test email**:
+   ```bash
+   php artisan exception-alert:test
+   ```
+
+5. **Clear caches**:
+   ```bash
+   php artisan optimize:clear
+   composer dump-autoload -o
+   ```
+
+---
+
+## Configuration
 
 ```php
 return [
-    'enabled' => true, // Master switch
-
+    'enabled' => env('EXCEPTION_ALERT_ENABLED', true),
+    'to' => env('EXCEPTION_ALERT_EMAIL', null),
     'exceptions' => [
-        404 => true,
-        401 => false,
-        403 => true,
-        419 => true,
-        429 => true,
+        400 => true,
+        404 => false,
         500 => true,
     ],
 ];
 ```
 
-If you want to disable all alerts, simply set:
+---
 
-```php
-'enabled' => false
-```
+## Commands
+
+| Command | Description |
+|----------|--------------|
+| `php artisan exception-alert:install` | Install and inject trait |
+| `php artisan exception-alert:test` | Send test alert email |
+| `php artisan exception-alert:uninstall` | Remove injected trait |
 
 ---
 
-## 🚀 How It Works
-
-Once installed, the package automatically injects its logic into Laravel’s global exception handler.  
-You don’t need to modify `app/Exceptions/Handler.php` — it’s handled automatically.
-
-Whenever an exception occurs:
-1. The package checks if alerts are enabled.
-2. It verifies if that exception type (e.g., 404, 500) is marked as `true` in the config.
-3. If allowed, an email is sent to the address from `.env` with full details including:
-   - Project name & URL
-   - Exception message
-   - File and line number
-   - Stack trace
-
----
-
-## 📬 Example Email Format
-
-**Subject:** `[Laravel Exception Alert] Error on myproject.com`
-
-**Body:**
-
-```
-Project: myproject.com
-Environment: production
-Exception: Division by zero
-File: /var/www/html/app/Http/Controllers/HomeController.php:42
-```
-
----
-
-## 🧑‍💻 Local Testing
-
-You can trigger a test alert manually:
+## Uninstall / Rollback
 
 ```bash
-php artisan exception-alert:test
+php artisan exception-alert:uninstall
+composer remove sambukhari/laravel-exception-alert
 ```
 
 ---
 
-## 🪪 License
+## Contributing
 
-This package is open-source software licensed under the [MIT license](LICENSE).
-
----
-
-## 👨‍💻 Author
-
-**Syed Ali Mujtaba Shah (sambukhari)**  
-[GitHub Profile](https://github.com/sambukhari)
+1. Fork this repo  
+2. Create feature branch  
+3. Submit PR  
 
 ---
 
-## 💡 Contribution
+## License
 
-Pull requests are welcome!  
-If you find a bug or want to suggest improvements, feel free to open an issue.
-
+This project is open-sourced under the [MIT License](LICENSE).
