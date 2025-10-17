@@ -19,10 +19,59 @@ class InstallExceptionAlert extends Command
         $this->files = new Filesystem();
     }
 
-    public function handle()
+    public function handle(): int
     {
-        $this->info('Publishing config and views...');
-        // Publish programmatically (same as vendor:publish)
+        $this->info('🚀 Installing Laravel Exception Alert...');
+
+        $this->publishResources();
+        $handlerPath = app_path('Exceptions/Handler.php');
+
+        if (! $this->files->exists($handlerPath)) {
+            $this->error("❌ Handler.php not found at {$handlerPath}. Please run this command inside a Laravel app.");
+            return 1;
+        }
+
+        $contents = $this->files->get($handlerPath);
+        $backupPath = $handlerPath . '.exception-alert.bak.' . time();
+
+        // Check for previous injection
+        $marker = '// exception-alert: injected by sambukhari/laravel-exception-alert';
+        if (Str::contains($contents, $marker) && ! $this->option('force')) {
+            $this->warn('⚠️  ExceptionAlert already integrated in Handler.php (marker found). Use --force to reinstall.');
+            return 0;
+        }
+
+        // Make backup before editing
+        $this->files->copy($handlerPath, $backupPath);
+        $this->info("💾 Backup created at: {$backupPath}");
+
+        // Step 1️⃣ Add trait import
+        $contents = $this->injectTraitImport($contents);
+
+        // Step 2️⃣ Add "use ExceptionAlertTrait;" inside the class
+        $contents = $this->injectTraitUsage($contents, $marker);
+
+        // Step 3️⃣ Add "$this->registerExceptionAlert();" inside register()
+        $contents = $this->injectRegisterCall($contents);
+
+        // Step 4️⃣ Write modified Handler
+        $this->files->put($handlerPath, $contents);
+
+        $this->newLine();
+        $this->info('✅ ExceptionAlert successfully integrated into Handler.php!');
+        $this->line('📩 Please set your EXCEPTION_ALERT_EMAIL in .env file.');
+        $this->newLine();
+
+        return 0;
+    }
+
+    /**
+     * Publish config & view files
+     */
+    protected function publishResources(): void
+    {
+        $this->info('📦 Publishing configuration and views...');
+
         $this->callSilent('vendor:publish', [
             '--provider' => "Sambukhari\\ExceptionAlert\\ExceptionAlertServiceProvider",
             '--tag' => 'exception-alert-config',
@@ -32,57 +81,80 @@ class InstallExceptionAlert extends Command
             '--provider' => "Sambukhari\\ExceptionAlert\\ExceptionAlertServiceProvider",
             '--tag' => 'exception-alert-views',
         ]);
+    }
 
-        $handlerPath = app_path('Exceptions/Handler.php');
-
-        if (! $this->files->exists($handlerPath)) {
-            $this->error("Handler.php not found at {$handlerPath}. Please run this command in a Laravel app.");
-            return 1;
-        }
-
-        $contents = $this->files->get($handlerPath);
-
-        // Idempotency checks
+    /**
+     * Inject the ExceptionAlertTrait import at the top.
+     */
+    protected function injectTraitImport(string $contents): string
+    {
         $traitImport = 'use Sambukhari\\ExceptionAlert\\Traits\\ExceptionAlertTrait;';
-        $traitUseLine = 'use ExceptionAlertTrait;';
-        $marker = '// exception-alert: injected by sambukhari/laravel-exception-alert';
 
-        if (Str::contains($contents, $marker)) {
-            $this->info('ExceptionAlert already installed in Handler.php (marker found).');
-            return 0;
+        if (Str::contains($contents, $traitImport)) {
+            $this->line('ℹ️  Trait import already present.');
+            return $contents;
         }
 
-        // Insert trait import after namespace line
-        $contents = preg_replace_callback('/^namespace\s+App\\\\Exceptions;\\s*/m', function ($m) use ($traitImport) {
-            return $m[0] . PHP_EOL . $traitImport . PHP_EOL;
-        }, $contents, 1, $count);
+        return preg_replace(
+            '/(namespace\s+App\\\\Exceptions;)/',
+            "$1\n\n{$traitImport}",
+            $contents,
+            1
+        );
+    }
 
-        if ($count === 0 && ! Str::contains($contents, $traitImport)) {
-            // fallback: prepend import after <?php
-            $contents = preg_replace('/^<\?php\\s*/', "<?php\n\nnamespace App\\Exceptions;\n\n{$traitImport}\n", $contents, 1);
+    /**
+     * Inject "use ExceptionAlertTrait;" inside Handler class.
+     */
+    protected function injectTraitUsage(string $contents, string $marker): string
+    {
+        if (Str::contains($contents, 'use ExceptionAlertTrait;')) {
+            $this->line('ℹ️  Trait usage already found inside Handler.');
+            return $contents;
         }
 
-        // Insert trait usage into class body (after existing trait uses or after class line)
-        if (preg_match('/class\s+Handler\s+extends\s+[^{]+\{/', $contents, $m)) {
-            $classDeclaration = $m[0];
-            $insertionPoint = strpos($contents, $classDeclaration) + strlen($classDeclaration);
-            // place trait use immediately after class opening brace with newline
-            $contents = substr_replace($contents, PHP_EOL . '    ' . $traitUseLine . PHP_EOL . '    ' . $marker . PHP_EOL, $insertionPoint, 0);
+        if (preg_match('/class\s+Handler\s+extends\s+[^{]+\{/', $contents, $matches)) {
+            $insertionPoint = strpos($contents, $matches[0]) + strlen($matches[0]);
+            $injection = "\n    use ExceptionAlertTrait;\n    {$marker}\n";
+            $contents = substr_replace($contents, $injection, $insertionPoint, 0);
+            $this->info('✅ Injected "use ExceptionAlertTrait;" into Handler.');
         } else {
-            $this->error('Could not find Handler class declaration. Aborting injection.');
-            return 1;
+            $this->error('❌ Could not locate Handler class definition.');
         }
 
-        // Backup existing Handler.php
-        $backupPath = $handlerPath . '.exception-alert.bak.' . time();
-        $this->files->copy($handlerPath, $backupPath);
-        $this->info("Backup created at: {$backupPath}");
+        return $contents;
+    }
 
-        // Write modified Handler.php
-        $this->files->put($handlerPath, $contents);
-        $this->info('ExceptionAlert trait injected into Handler.php (one-time).');
+    /**
+     * Ensure register() contains $this->registerExceptionAlert();
+     */
+    protected function injectRegisterCall(string $contents): string
+    {
+        if (Str::contains($contents, '$this->registerExceptionAlert();')) {
+            $this->line('ℹ️  registerExceptionAlert() call already exists.');
+            return $contents;
+        }
 
-        $this->info('Installation complete. Please verify config/exception-alert.php and set EXCEPTION_ALERT_EMAIL in your .env');
-        return 0;
+        // If register() method exists, insert the call inside it
+        if (preg_match('/function\s+register\s*\(\s*\)\s*\{/', $contents)) {
+            $contents = preg_replace(
+                '/(function\s+register\s*\(\s*\)\s*\{\s*)/',
+                "$1\n        \$this->registerExceptionAlert();\n",
+                $contents,
+                1
+            );
+            $this->info('✅ Added $this->registerExceptionAlert(); inside register().');
+        } else {
+            // If no register() found, create one at the end of the class
+            $contents = preg_replace(
+                '/\}\s*$/',
+                "\n    public function register()\n    {\n        \$this->registerExceptionAlert();\n    }\n\n}",
+                $contents,
+                1
+            );
+            $this->info('✅ Created register() method with $this->registerExceptionAlert();');
+        }
+
+        return $contents;
     }
 }

@@ -3,55 +3,64 @@
 namespace Sambukhari\ExceptionAlert\Traits;
 
 use Throwable;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Sambukhari\ExceptionAlert\Mail\ExceptionOccurred;
 
+/**
+ * ExceptionAlertTrait
+ *
+ * This trait safely registers an exception alert hook without overriding
+ * the project's existing report() or render() methods.
+ *
+ * When used inside App\Exceptions\Handler, it attaches a reportable() callback
+ * to send email alerts for uncaught exceptions.
+ */
 trait ExceptionAlertTrait
 {
     /**
-     * Extension-safe report method.
-     * If the consuming class (Handler) defines its own report, it will call parent::report() by default.
+     * Register the exception alert hook via Laravel's reportable() method.
+     * Must be called inside the Handler's register() method.
      *
-     * Note: When this trait is injected into Handler, it will add/override report().
-     * We call parent::report($e) if available to preserve existing behavior.
+     * Example:
+     * public function register()
+     * {
+     *     $this->registerExceptionAlert();
+     *     // other reportable logic...
+     * }
      */
-    public function report(Throwable $exception)
+    public function registerExceptionAlert(): void
     {
-        // Preserve existing report behavior (if parent exists)
-        if (method_exists(get_parent_class($this) ?: '', 'report')) {
-            try {
-                parent::report($exception);
-            } catch (\Throwable $ex) {
-                // swallow parent report errors to avoid breaking alerts
-                \Log::warning('ExceptionAlert: parent::report() threw: ' . $ex->getMessage());
-            }
-        } else {
-            // call ExceptionHandler::report if available (safety)
-            if (is_callable(['\Illuminate\Foundation\Exceptions\Handler', 'report'])) {
-                try {
-                    \Illuminate\Foundation\Exceptions\Handler::report($exception);
-                } catch (\Throwable $ex) {
-                    \Log::warning('ExceptionAlert: base report threw: ' . $ex->getMessage());
-                }
-            }
+        if (!method_exists($this, 'reportable')) {
+            Log::warning('ExceptionAlert: reportable() method not found in Handler.');
+            return;
         }
 
-        // Do our alerting
-        try {
+        $this->reportable(function (Throwable $exception) {
             if (!config('exception-alert.enabled', true)) {
                 return;
             }
 
-            $status = method_exists($exception, 'getStatusCode') ? $exception->getStatusCode() : 500;
+            try {
+                $status = method_exists($exception, 'getStatusCode')
+                    ? $exception->getStatusCode()
+                    : 500;
 
-            if (!config("exception-alert.exceptions.$status", true)) {
-                return;
+                if (!config("exception-alert.exceptions.$status", true)) {
+                    return;
+                }
+
+                // Send email alert (sync by default)
+                Mail::to(config('exception-alert.to'))->send(
+                    new ExceptionOccurred($exception)
+                );
+
+                Log::info('ExceptionAlert: Exception email sent for ' . get_class($exception));
+            } catch (\Throwable $mailEx) {
+                Log::error('ExceptionAlert: Failed to send exception email', [
+                    'error' => $mailEx->getMessage(),
+                ]);
             }
-
-            // Send email (synchronous). Users can change to queued by customizing Mailable.
-            Mail::to(config('exception-alert.to'))->send(new ExceptionOccurred($exception));
-        } catch (\Throwable $mailEx) {
-            \Log::error('ExceptionAlert: Failed to send exception email: ' . $mailEx->getMessage());
-        }
+        });
     }
 }
