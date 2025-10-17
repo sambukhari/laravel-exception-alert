@@ -2,10 +2,10 @@
 
 namespace Sambukhari\ExceptionAlert\Mail;
 
-use Throwable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
+use Throwable;
 
 class ExceptionOccurred extends Mailable
 {
@@ -20,14 +20,12 @@ class ExceptionOccurred extends Mailable
 
     public function build()
     {
-        return $this->subject('🚨 Laravel Exception: '.$this->exception->getMessage())
-            ->view('exception-alert::email')
-            ->with([
-                'messageText' => $this->exception->getMessage(),
-                'file' => $this->exception->getFile(),
-                'line' => $this->exception->getLine(),
-                'url' => request()->fullUrl(),
-                'trace' => $this->exception->getTraceAsString(),
-            ]);
+        return $this->subject('🚨 Exception Alert: ' . get_class($this->exception))
+                    ->view('exception-alert::email')
+                    ->with([
+                        'exception' => $this->exception,
+                        'url' => config('app.url'),
+                        'app' => config('app.name'),
+                    ]);
     }
 }
